@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.core.io.resource.StringResource;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
@@ -9,8 +10,10 @@ import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IVoucherService;
 import com.hmdp.utils.RedisIDWorker;
+import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private ISeckillVoucherService seckillVoucherService;
     @Resource
     private RedisIDWorker redisIDWorker;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
 
     /**
      * 秒杀优惠券的功能
@@ -57,11 +63,23 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 这里加锁保证锁住的是同一个用户
         // 获得userId的时候，会新建一个Long对象，toString之后仍然会新建String对象
         // 调用intern方法之后，就会使用同一个字面量，也就是对应的userId的字面量，这样就可以保证锁住同一个对象
-        synchronized (userId.toString().intern()){
+        /*synchronized (userId.toString().intern()){
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
-        }
+        }*/
 
+        //使用分布式锁
+        SimpleRedisLock lock = new SimpleRedisLock(stringRedisTemplate, "order" + userId);
+        String lockKey = "order" + userId;
+        if (!lock.tryLock(10L)) {
+            return Result.fail("不可以重复下单");
+        }
+        try {
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Transactional
