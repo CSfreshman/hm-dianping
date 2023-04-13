@@ -29,8 +29,11 @@ public class BlogController {
 
     @Resource
     private IBlogService blogService;
-    @Resource
-    private IUserService userService;
+
+    @GetMapping("/{id}")
+    public Result queryBlogById(@PathVariable("id") Long id) {
+        return blogService.queryBlogById(id);
+    }
 
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
@@ -45,10 +48,11 @@ public class BlogController {
 
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
-        // 修改点赞数量
+        /*// 修改点赞数量
         blogService.update()
                 .setSql("liked = liked + 1").eq("id", id).update();
-        return Result.ok();
+        return Result.ok();*/
+        return blogService.likeBlog(id);
     }
 
     @GetMapping("/of/me")
@@ -65,7 +69,7 @@ public class BlogController {
 
     @GetMapping("/hot")
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
-        // 根据用户查询
+        /*// 根据用户查询
         Page<Blog> page = blogService.query()
                 .orderByDesc("liked")
                 .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
@@ -78,6 +82,12 @@ public class BlogController {
             blog.setName(user.getNickName());
             blog.setIcon(user.getIcon());
         });
-        return Result.ok(records);
+        return Result.ok(records);*/
+        return blogService.queryHotBlog(current);
+    }
+
+    @GetMapping("/likes/{id}")
+    public Result likes(@PathVariable("id") Long id) {
+        return blogService.likes(id);
     }
 }
