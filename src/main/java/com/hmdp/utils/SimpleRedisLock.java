@@ -56,6 +56,6 @@ public class SimpleRedisLock implements ILock {
         }*/
 
         // 执行lua脚本，实现判断锁标识和删除锁的原子性
-        stringRedisTemplate.execute(UNLOCK_SCRIPT, Collections.singletonList(LOCK_PREFIX + LOCK_NAME), Collections.singletonList(ID_PREFIX + Thread.currentThread().getId()));
+        stringRedisTemplate.execute(UNLOCK_SCRIPT, Collections.singletonList(LOCK_PREFIX + LOCK_NAME), ID_PREFIX + Thread.currentThread().getId());
     }
 }
