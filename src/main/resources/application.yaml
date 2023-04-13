@@ -26,3 +26,5 @@ logging:
   level:
     com.hmdp: debug
 
+user:
+  luaFileName: unlock.lua
