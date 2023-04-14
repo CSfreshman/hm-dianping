@@ -14,15 +14,20 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.SystemConstants;
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
 import java.sql.Time;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -109,8 +114,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         userDTO.setIcon(user.getIcon());
         Map<String, Object> userDtoMap = beanToMap(userDTO);
         // 以hash形式存储userDto，并设置了30分钟有效期
-        stringRedisTemplate.opsForHash().putAll(RedisConstants.LOGIN_USER_KEY + token,userDtoMap);
-        stringRedisTemplate.expire(RedisConstants.LOGIN_USER_KEY + token,RedisConstants.LOGIN_USER_TTL, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForHash().putAll(RedisConstants.LOGIN_USER_KEY + token, userDtoMap);
+        stringRedisTemplate.expire(RedisConstants.LOGIN_USER_KEY + token, RedisConstants.LOGIN_USER_TTL, TimeUnit.MINUTES);
 
 
         // 7.将token返回前端
@@ -118,15 +123,81 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return Result.ok(token);
     }
 
+    /**
+     * 实现用户签到
+     *
+     * @return
+     */
+    @Override
+    public Result sign() {
+        //获取当前登陆用户
+        Long id = UserHolder.getUser().getId();
+        //获取日期
+        LocalDateTime now = LocalDateTime.now();
+        //拼接key
+        String yyyyMM = now.format(DateTimeFormatter.ofPattern("yyyy:MM:"));
+        String key = RedisConstants.USER_SIGN_KEY + yyyyMM + id;
+        //获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //写了redis
+        stringRedisTemplate.opsForValue().setBit(key, dayOfMonth - 1, true);
+        return Result.ok();
+    }
+
+    /**
+     * 统计连续签到天数
+     */
+    @Override
+    public Result signCount() {
+        //获取当前登陆用户
+        Long id = UserHolder.getUser().getId();
+        //获取日期
+        LocalDateTime now = LocalDateTime.now();
+        //拼接key
+        String yyyyMM = now.format(DateTimeFormatter.ofPattern("yyyy:MM:"));
+        String key = RedisConstants.USER_SIGN_KEY + yyyyMM + id;
+        //获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //获取截至本月今天的所有签到记录
+        List<Long> result = stringRedisTemplate.opsForValue().bitField(key
+                , BitFieldSubCommands
+                        .create()
+                        .get(BitFieldSubCommands.BitFieldType
+                                .unsigned(dayOfMonth))
+                        .valueAt(0)
+        );
+        if (result == null || result.isEmpty()) {
+            return Result.ok(0);
+        }
+        Long num = result.get(0);
+        if (num == null || num == 0) {
+            return Result.ok(0);
+        }
+        //转二进制字符串
+        String binaryString = Long.toBinaryString(num);
+        //计算连续签到天数
+        int count = 0;
+        for (int i = binaryString.length() - 1; i >= 0; i--) {
+            if (binaryString.charAt(i) == '1') {
+                count++;
+            } else {
+                break;
+            }
+        }
+        //返回
+        return Result.ok(count);
+    }
+
 
     /**
      * 将UserDTO对象转换为Map对象，
+     *
      * @param userDTO
      * @return
      */
-    private Map<String,Object> beanToMap(UserDTO userDTO){
+    private Map<String, Object> beanToMap(UserDTO userDTO) {
         HashMap<String, Object> map = new HashMap<>();
-        map.put("id",String.valueOf(userDTO.getId()));
+        map.put("id", String.valueOf(userDTO.getId()));
         map.put("nickName",userDTO.getNickName());
         map.put("icno",userDTO.getIcon());
         return map;
