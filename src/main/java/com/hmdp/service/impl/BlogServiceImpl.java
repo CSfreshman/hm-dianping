@@ -116,7 +116,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         // 得到top5的值
         Set<String> range = stringRedisTemplate.opsForZSet().range(RedisConstants.BLOG_LIKED_KEY + id, 0, 4);
         if (range == null || range.size() == 0) {
-            return Result.fail("查询失败");
+            return Result.ok();
         }
 
         List<Long> userIds = range.stream().map(Long::parseLong).collect(Collectors.toList());
@@ -138,7 +138,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
      * 给Blog赋值，User信息
      */
     private void queryBlogUser(Blog blog) {
-        User user = userService.getById(UserHolder.getUser().getId());
+        User user = userService.getById(blog.getUserId());
         blog.setIcon(user.getIcon());
         blog.setName(user.getNickName());
     }
